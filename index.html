@@ -77,7 +77,19 @@ if(!recipes.length){
  steps:'1. 漬けダレを作る\n2. マグロを漬ける\n3. 酢飯にのせる',memo:'',source:'ChatGPT',updated:Date.now()}];
 }
 function persist(){localStorage.setItem(KEY,JSON.stringify(recipes))}
-function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='home')renderList();scrollTo(0,0)}
+let currentScreen='home';
+function renderScreen(id){
+ document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));
+ document.getElementById(id).classList.add('active');
+ currentScreen=id;
+ if(id==='home')renderList();
+ scrollTo(0,0);
+}
+function show(id){
+ renderScreen(id);
+ if(id==='home') history.replaceState({screen:'home'},'',location.href);
+ else history.pushState({screen:id},'',location.href);
+}
 function esc(s=''){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function setFilter(el,f){filter=f;document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));el.classList.add('active');renderList()}
 function renderList(){
@@ -138,7 +150,22 @@ function importBackup(){
  const f=document.getElementById('importFile').files[0];if(!f){alert('バックアップファイルを選択してください');return}
  const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.app!=='recipe-book'||!Array.isArray(d.recipes))throw 0;if(!confirm(`${d.recipes.length}件を復元し、現在のデータを置き換えます。よろしいですか？`))return;recipes=d.recipes;persist();alert('復元しました');show('home')}catch(e){alert('有効なバックアップファイルではありません')}};r.readAsText(f);
 }
+history.replaceState({screen:'home'},'',location.href);
 renderList();
+
+window.addEventListener('popstate',()=>{
+ if(currentScreen!=='home'){
+  editingId=null;
+  renderScreen('home');
+  history.replaceState({screen:'home'},'',location.href);
+  return;
+ }
+ if(confirm('アプリを終了しますか？')){
+  history.back();
+ }else{
+  history.pushState({screen:'home'},'',location.href);
+ }
+});
 </script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("service-worker.js"));}</script>
 </body>
