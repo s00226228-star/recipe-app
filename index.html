@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#faf8f3">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>レシピ帳</title>
+<style>
+:root{--bg:#faf8f3;--card:#fff;--text:#25231f;--muted:#77736b;--line:#e7e1d8;--accent:#5b6d52}
+*{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;background:var(--bg);color:var(--text)}
+.app{max-width:720px;margin:auto;min-height:100vh;padding:env(safe-area-inset-top) 16px calc(88px + env(safe-area-inset-bottom))}
+header{position:sticky;top:0;background:rgba(250,248,243,.96);backdrop-filter:blur(8px);padding:18px 0 12px;z-index:5}
+h1{font-size:24px;margin:0 0 14px}.top{display:flex;justify-content:space-between;align-items:center}
+button,input,textarea,select{font:inherit}.icon{border:0;background:var(--accent);color:white;width:42px;height:42px;border-radius:50%;font-size:26px}
+.search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff}
+.filters{display:flex;gap:7px;margin-top:10px;overflow:auto}.filter{border:1px solid var(--line);background:white;border-radius:999px;padding:7px 13px;white-space:nowrap}
+.filter.active{background:var(--text);color:white}
+.list{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:flex;gap:12px;align-items:center;padding:16px;border-bottom:1px solid var(--line);cursor:pointer}.row:last-child{border-bottom:0}
+.rating{font-weight:700;width:25px;text-align:center}.name{font-size:17px}.empty{padding:32px;text-align:center;color:var(--muted)}
+.screen{display:none}.screen.active{display:block}.back{border:0;background:none;font-size:17px;padding:8px 0}
+.recipe-title{font-size:25px;font-weight:700;margin:16px 0}.detail-rating{display:inline-block;margin-right:8px}.servings-display{font-size:17px;font-weight:600;color:var(--text);margin:4px 0 18px}
+.section{margin:25px 0}.section h2{font-size:18px;margin-bottom:10px}.text{white-space:pre-wrap;line-height:1.8}
+.actions{display:flex;gap:8px;margin-top:28px}.btn{border:1px solid var(--line);background:white;border-radius:11px;padding:11px 15px}.primary{background:var(--accent);color:white;border-color:var(--accent)}
+label{display:block;font-weight:600;margin:17px 0 7px}.field{width:100%;padding:11px;border:1px solid var(--line);border-radius:10px;background:white}
+textarea{min-height:150px;resize:vertical}.hint{font-size:13px;color:var(--muted);line-height:1.5}.danger{color:#a33}
+</style>
+</head>
+<body>
+<div class="app">
+<section id="home" class="screen active">
+<header>
+ <div class="top"><h1>レシピ</h1><div style="display:flex;gap:8px"><button class="btn" onclick="show('backup')" style="padding:8px 11px">保存</button><button class="icon" onclick="newRecipe()">＋</button></div></div>
+ <input id="search" class="search" placeholder="料理名・材料を検索" oninput="renderList()">
+ <div class="filters">
+  <button class="filter active" data-f="" onclick="setFilter(this,'')">すべて</button>
+  <button class="filter" data-f="◎" onclick="setFilter(this,'◎')">◎</button>
+  <button class="filter" data-f="○" onclick="setFilter(this,'○')">○</button>
+  <button class="filter" data-f="△" onclick="setFilter(this,'△')">△</button>
+  <button class="filter" data-f="未評価" onclick="setFilter(this,'未評価')">未評価</button>
+ </div>
+</header>
+<div id="list" class="list"></div>
+</section>
+
+<section id="detail" class="screen">
+<button class="back" onclick="show('home')">← 一覧へ</button>
+<div id="detailBody"></div>
+</section>
+
+<section id="edit" class="screen">
+<button class="back" onclick="show(editingId ? 'detail':'home')">← 戻る</button>
+<h1 id="editHeading">レシピを追加</h1>
+<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0 22px"><label style="margin-top:0">レシピ全文から自動入力</label><textarea id="rawRecipe" class="field" style="min-height:190px" placeholder="【大東寿司】&#10;・マグロ：200g&#10;・醤油：大さじ3&#10;&#10;1. 漬けダレを作る&#10;2. マグロを漬ける"></textarea><div class="actions" style="margin-top:10px"><button class="btn primary" onclick="parseRecipe()">自動解析する</button><button class="btn" onclick="document.getElementById('rawRecipe').value=''">クリア</button></div><p class="hint">【料理名】、「・材料：分量」、番号付き手順を認識します。</p></div><label>料理名</label><input id="name" class="field" placeholder="例：大東寿司">
+<label>評価</label>
+<select id="ratingEdit" class="field"><option value="">未評価</option><option>◎</option><option>○</option><option>△</option></select>
+<label>基準量</label><input id="servings" class="field" placeholder="例：2人分、4皿分">
+<label>材料</label><textarea id="ingredients" class="field" placeholder="・マグロ：200g&#10;・醤油：大さじ3"></textarea>
+<label>作り方</label><textarea id="steps" class="field" placeholder="1. 漬けダレを作る&#10;2. マグロを漬ける"></textarea>
+<label>メモ</label><textarea id="memo" class="field" style="min-height:90px"></textarea>
+<label>元レシピ</label><input id="source" class="field" placeholder="URL、ChatGPT、書籍名など">
+<p class="hint">材料・作り方は、これまで使っているテキスト形式をそのまま貼り付けられます。</p>
+<div class="actions"><button class="btn primary" onclick="saveRecipe()">保存する</button></div>
+</section>
+<section id="backup" class="screen">
+<button class="back" onclick="show('home')">← 一覧へ</button><h1>バックアップ</h1>
+<div class="section"><h2>バックアップを書き出す</h2><p class="text">登録している全レシピを1つのファイルに保存します。端末紛失に備えて、書き出したファイルをGoogle Driveなど端末外にも保存してください。</p><button class="btn primary" onclick="exportBackup()">バックアップを書き出す</button></div>
+<div class="section"><h2>バックアップから復元</h2><p class="text">以前書き出したバックアップファイルを選択して復元します。</p><input id="importFile" type="file" accept=".json,application/json" class="field"><div class="actions"><button class="btn" onclick="importBackup()">復元する</button></div><p class="hint">復元すると、現在この端末に保存されているレシピはバックアップ内容に置き換わります。</p></div>
+</section></div><script>
+const KEY='my-recipes-v1';
+let recipes=JSON.parse(localStorage.getItem(KEY)||'[]'), filter='', currentId=null, editingId=null;
+if(!recipes.length){
+ recipes=[{id:Date.now(),name:'サンプル：大東寿司',rating:'◎',servings:'2人分',
+ ingredients:'・マグロ：200g\n・醤油：大さじ3\n・砂糖：大さじ2\n・みりん：大さじ1\n・酢飯：400g',
+ steps:'1. 漬けダレを作る\n2. マグロを漬ける\n3. 酢飯にのせる',memo:'',source:'ChatGPT',updated:Date.now()}];
+}
+function persist(){localStorage.setItem(KEY,JSON.stringify(recipes))}
+function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='home')renderList();scrollTo(0,0)}
+function esc(s=''){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function setFilter(el,f){filter=f;document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));el.classList.add('active');renderList()}
+function renderList(){
+ const q=document.getElementById('search').value.trim().toLowerCase();
+ const arr=[...recipes].sort((a,b)=>b.updated-a.updated).filter(r=>(!filter||(filter==='未評価'?!r.rating:r.rating===filter))&&(!q||(r.name+r.ingredients).toLowerCase().includes(q)));
+ document.getElementById('list').innerHTML=arr.length?arr.map(r=>`<div class="row" onclick="openRecipe(${r.id})"><span class="rating">${r.rating||''}</span><span class="name">${esc(r.name)}</span></div>`).join(''):'<div class="empty">該当するレシピはありません</div>';
+}
+function openRecipe(id){
+ currentId=id;const r=recipes.find(x=>x.id===id);if(!r)return;
+ document.getElementById('detailBody').innerHTML=`<div class="recipe-title"><span class="detail-rating">${r.rating||''}</span>【${esc(r.name)}】</div>
+ ${r.servings?`<div class="servings-display">${esc(r.servings)}</div>`:''}
+ <div class="section"><h2>材料</h2><div class="text">${esc(r.ingredients)}</div></div>
+ <div class="section"><h2>作り方</h2><div class="text">${esc(r.steps)}</div></div>
+ ${r.memo?`<div class="section"><h2>メモ</h2><div class="text">${esc(r.memo)}</div></div>`:''}
+ ${r.source?`<div class="section"><h2>元レシピ</h2><div class="text">${esc(r.source)}</div></div>`:''}
+ <div class="actions"><button class="btn" onclick="editRecipe()">編集</button><button class="btn danger" onclick="deleteRecipe()">削除</button></div>`;
+ show('detail');
+}
+function newRecipe(){editingId=null;currentId=null;document.getElementById('editHeading').textContent='レシピを追加';['name','servings','ingredients','steps','memo','source'].forEach(id=>document.getElementById(id).value='');document.getElementById('ratingEdit').value='';document.getElementById('rawRecipe').value='';show('edit')}
+function editRecipe(){const r=recipes.find(x=>x.id===currentId);editingId=currentId;document.getElementById('editHeading').textContent='レシピを編集';['name','servings','ingredients','steps','memo','source'].forEach(id=>document.getElementById(id).value=r[id]||'');document.getElementById('ratingEdit').value=r.rating||'';document.getElementById('rawRecipe').value='';show('edit')}
+function saveRecipe(){
+ const name=document.getElementById('name').value.trim();if(!name){alert('料理名を入力してください');return}
+ const data={name,rating:document.getElementById('ratingEdit').value,servings:document.getElementById('servings').value.trim(),ingredients:document.getElementById('ingredients').value.trim(),steps:document.getElementById('steps').value.trim(),memo:document.getElementById('memo').value.trim(),source:document.getElementById('source').value.trim(),updated:Date.now()};
+ if(editingId){const i=recipes.findIndex(x=>x.id===editingId);recipes[i]={...recipes[i],...data};currentId=editingId}else{data.id=Date.now();recipes.push(data);currentId=data.id}
+ persist();openRecipe(currentId);
+}
+function deleteRecipe(){if(confirm('このレシピを削除しますか？')){recipes=recipes.filter(x=>x.id!==currentId);persist();show('home')}}
+function parseRecipe(){
+ const raw=document.getElementById('rawRecipe').value.replace(/\r/g,'').trim();
+ if(!raw){alert('レシピ全文を貼り付けてください');return}
+ const lines=raw.split('\n');let name='',ingredients=[],steps=[],memos=[],mode='ingredients';
+ const t=raw.match(/【([^】]+)】/);if(t)name=t[1].trim();
+ for(let line of lines){
+  line=line.trim();if(!line||/^【[^】]+】$/.test(line))continue;
+  if(/^(材料|材料[:：])$/.test(line)){mode='ingredients';continue}
+  if(/^(作り方|手順|作りかた|調理手順)[:：]?$/.test(line)){mode='steps';continue}
+  if(/^(メモ|コメント|備考|感想)[:：]?$/.test(line)){mode='memo';continue}
+  if(/^[→⇒]/.test(line)){mode='memo';memos.push(line.replace(/^[→⇒]\s*/,''));continue}
+  if(mode==='ingredients'&&/^・/.test(line)){ingredients.push(line);continue}
+  if(/^(?:\d+[\.\．\)）]|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]|[１-９][\.\．\)）])\s*/.test(line)){mode='steps';steps.push(line);continue}
+  if(mode==='steps'){if(steps.length)steps[steps.length-1]+='\n'+line;else steps.push(line);continue}
+  if(mode==='memo'){memos.push(line);continue}
+ }
+ if(!name){const f=lines.map(x=>x.trim()).find(x=>x&&!/^(材料|作り方|手順|メモ|コメント|備考|感想)/.test(x));if(f&&!f.startsWith('・'))name=f.replace(/^#+\s*/,'').trim()}
+ if(name)document.getElementById('name').value=name;
+ if(ingredients.length)document.getElementById('ingredients').value=ingredients.join('\n');
+ if(steps.length)document.getElementById('steps').value=steps.join('\n');
+ if(memos.length)document.getElementById('memo').value=memos.join('\n');
+ alert('解析しました。内容を確認してから保存してください。');
+}
+function exportBackup(){
+ const data={app:'recipe-book',version:1,exportedAt:new Date().toISOString(),recipes};
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const d=new Date(),p=n=>String(n).padStart(2,'0'),a=document.createElement('a');
+ a.href=URL.createObjectURL(blob);a.download=`recipe_backup_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function importBackup(){
+ const f=document.getElementById('importFile').files[0];if(!f){alert('バックアップファイルを選択してください');return}
+ const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.app!=='recipe-book'||!Array.isArray(d.recipes))throw 0;if(!confirm(`${d.recipes.length}件を復元し、現在のデータを置き換えます。よろしいですか？`))return;recipes=d.recipes;persist();alert('復元しました');show('home')}catch(e){alert('有効なバックアップファイルではありません')}};r.readAsText(f);
+}
+renderList();
+</script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("service-worker.js"));}</script>
+</body>
+</html>
