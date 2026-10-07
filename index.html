@@ -74,7 +74,7 @@ textarea{min-height:150px;resize:vertical}.hint{font-size:13px;color:var(--muted
 </section></div><script>
 const KEY='my-recipes-v1';
 let recipes=JSON.parse(localStorage.getItem(KEY)||'[]'), filter='', currentId=null, editingId=null;
-const GENRES=['肉料理','魚介料理','野菜料理','卵料理','ご飯・丼','麺類','カレー','粉もの','汁物・スープ','鍋料理','副菜・おつまみ','タレ・ソース','パン','お菓子・デザート'];
+const GENRES=['肉料理','魚介料理','野菜料理','卵料理','ご飯・丼','麺類','カレー','粉もの','揚げ物','汁物・スープ','鍋料理','副菜・おつまみ','タレ・ソース','パン','お菓子・デザート'];
 function setupGenres(){
  const o=GENRES.map(g=>`<option value="${g}">${g}</option>`).join('');
  document.getElementById('genreFilter').innerHTML='<option value="">ジャンル：すべて</option><option value="未分類">未分類</option>'+o;
