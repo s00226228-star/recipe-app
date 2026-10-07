@@ -15,7 +15,7 @@ header{position:sticky;top:0;background:rgba(250,248,243,.96);backdrop-filter:bl
 h1{font-size:24px;margin:0 0 14px}.top{display:flex;justify-content:space-between;align-items:center}
 button,input,textarea,select{font:inherit}.icon{border:0;background:var(--accent);color:white;width:42px;height:42px;border-radius:50%;font-size:26px}
 .search{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff}
-.filters{display:flex;gap:7px;margin-top:10px;overflow:auto}.filter{border:1px solid var(--line);background:white;border-radius:999px;padding:7px 13px;white-space:nowrap}
+.genre-filter{width:100%;margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:white}.filters{display:flex;gap:7px;margin-top:10px;overflow:auto}.filter{border:1px solid var(--line);background:white;border-radius:999px;padding:7px 13px;white-space:nowrap}
 .filter.active{background:var(--text);color:white}
 .list{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
 .row{display:flex;gap:12px;align-items:center;padding:16px;border-bottom:1px solid var(--line);cursor:pointer}.row:last-child{border-bottom:0}
@@ -34,6 +34,7 @@ textarea{min-height:150px;resize:vertical}.hint{font-size:13px;color:var(--muted
 <header>
  <div class="top"><h1>レシピ</h1><div style="display:flex;gap:8px"><button class="btn" onclick="show('backup')" style="padding:8px 11px">保存</button><button class="icon" onclick="newRecipe()">＋</button></div></div>
  <input id="search" class="search" placeholder="料理名・材料を検索" oninput="renderList()">
+ <select id="genreFilter" class="genre-filter" onchange="renderList()"></select>
  <div class="filters">
   <button class="filter active" data-f="" onclick="setFilter(this,'')">すべて</button>
   <button class="filter" data-f="◎" onclick="setFilter(this,'◎')">◎</button>
@@ -54,6 +55,8 @@ textarea{min-height:150px;resize:vertical}.hint{font-size:13px;color:var(--muted
 <button class="back" onclick="show(editingId ? 'detail':'home')">← 戻る</button>
 <h1 id="editHeading">レシピを追加</h1>
 <div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:14px 0 22px"><label style="margin-top:0">レシピ全文から自動入力</label><textarea id="rawRecipe" class="field" style="min-height:190px" placeholder="【大東寿司】&#10;・マグロ：200g&#10;・醤油：大さじ3&#10;&#10;1. 漬けダレを作る&#10;2. マグロを漬ける"></textarea><div class="actions" style="margin-top:10px"><button class="btn primary" onclick="parseRecipe()">自動解析する</button><button class="btn" onclick="document.getElementById('rawRecipe').value=''">クリア</button></div><p class="hint">【料理名】、「・材料：分量」、番号付き手順を認識します。</p></div><label>料理名</label><input id="name" class="field" placeholder="例：大東寿司">
+<label>ジャンル1</label><select id="genre1" class="field"></select>
+<label>ジャンル2</label><select id="genre2" class="field"></select>
 <label>評価</label>
 <select id="ratingEdit" class="field"><option value="">未評価</option><option>◎</option><option>○</option><option>△</option></select>
 <label>基準量</label><input id="servings" class="field" placeholder="例：2人分、4皿分">
@@ -71,6 +74,13 @@ textarea{min-height:150px;resize:vertical}.hint{font-size:13px;color:var(--muted
 </section></div><script>
 const KEY='my-recipes-v1';
 let recipes=JSON.parse(localStorage.getItem(KEY)||'[]'), filter='', currentId=null, editingId=null;
+const GENRES=['肉料理','魚介料理','野菜料理','卵料理','ご飯・丼','麺類','カレー','粉もの','汁物・スープ','鍋料理','副菜・おつまみ','タレ・ソース','パン','お菓子・デザート'];
+function setupGenres(){
+ const o=GENRES.map(g=>`<option value="${g}">${g}</option>`).join('');
+ document.getElementById('genreFilter').innerHTML='<option value="">ジャンル：すべて</option><option value="未分類">未分類</option>'+o;
+ document.getElementById('genre1').innerHTML='<option value="">未分類</option>'+o;
+ document.getElementById('genre2').innerHTML='<option value="">なし</option>'+o;
+}
 if(!recipes.length){
  recipes=[{id:Date.now(),name:'サンプル：大東寿司',rating:'◎',servings:'2人分',
  ingredients:'・マグロ：200g\n・醤油：大さじ3\n・砂糖：大さじ2\n・みりん：大さじ1\n・酢飯：400g',
@@ -93,14 +103,15 @@ function show(id){
 function esc(s=''){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function setFilter(el,f){filter=f;document.querySelectorAll('.filter').forEach(x=>x.classList.remove('active'));el.classList.add('active');renderList()}
 function renderList(){
- const q=document.getElementById('search').value.trim().toLowerCase();
- const arr=[...recipes].sort((a,b)=>b.updated-a.updated).filter(r=>(!filter||(filter==='未評価'?!r.rating:r.rating===filter))&&(!q||(r.name+r.ingredients).toLowerCase().includes(q)));
+ const q=document.getElementById('search').value.trim().toLowerCase(),gf=document.getElementById('genreFilter').value;
+ const arr=[...recipes].sort((a,b)=>b.updated-a.updated).filter(r=>{const gs=[r.genre1,r.genre2].filter(Boolean);return (!gf||(gf==='未分類'?gs.length===0:gs.includes(gf)))&&(!filter||(filter==='未評価'?!r.rating:r.rating===filter))&&(!q||(r.name+r.ingredients).toLowerCase().includes(q));});
  document.getElementById('list').innerHTML=arr.length?arr.map(r=>`<div class="row" onclick="openRecipe(${r.id})"><span class="rating">${r.rating||''}</span><span class="name">${esc(r.name)}</span></div>`).join(''):'<div class="empty">該当するレシピはありません</div>';
 }
 function openRecipe(id){
  currentId=id;const r=recipes.find(x=>x.id===id);if(!r)return;
  document.getElementById('detailBody').innerHTML=`<div class="recipe-title"><span class="detail-rating">${r.rating||''}</span>【${esc(r.name)}】</div>
  ${r.servings?`<div class="servings-display">${esc(r.servings)}</div>`:''}
+ ${[r.genre1,r.genre2].filter(Boolean).length?`<div class="hint">ジャンル：${[r.genre1,r.genre2].filter(Boolean).map(esc).join("・")}</div>`:'<div class="hint">ジャンル：未分類</div>'}
  <div class="section"><h2>材料</h2><div class="text">${esc(r.ingredients)}</div></div>
  <div class="section"><h2>作り方</h2><div class="text">${esc(r.steps)}</div></div>
  ${r.memo?`<div class="section"><h2>メモ</h2><div class="text">${esc(r.memo)}</div></div>`:''}
@@ -108,11 +119,12 @@ function openRecipe(id){
  <div class="actions"><button class="btn" onclick="editRecipe()">編集</button><button class="btn danger" onclick="deleteRecipe()">削除</button></div>`;
  show('detail');
 }
-function newRecipe(){editingId=null;currentId=null;document.getElementById('editHeading').textContent='レシピを追加';['name','servings','ingredients','steps','memo','source'].forEach(id=>document.getElementById(id).value='');document.getElementById('ratingEdit').value='';document.getElementById('rawRecipe').value='';show('edit')}
-function editRecipe(){const r=recipes.find(x=>x.id===currentId);editingId=currentId;document.getElementById('editHeading').textContent='レシピを編集';['name','servings','ingredients','steps','memo','source'].forEach(id=>document.getElementById(id).value=r[id]||'');document.getElementById('ratingEdit').value=r.rating||'';document.getElementById('rawRecipe').value='';show('edit')}
+function newRecipe(){editingId=null;currentId=null;document.getElementById('editHeading').textContent='レシピを追加';['name','servings','ingredients','steps','memo','source'].forEach(id=>document.getElementById(id).value='');document.getElementById('ratingEdit').value='';document.getElementById('genre1').value='';document.getElementById('genre2').value='';document.getElementById('rawRecipe').value='';show('edit')}
+function editRecipe(){const r=recipes.find(x=>x.id===currentId);editingId=currentId;document.getElementById('editHeading').textContent='レシピを編集';['name','servings','ingredients','steps','memo','source'].forEach(id=>document.getElementById(id).value=r[id]||'');document.getElementById('ratingEdit').value=r.rating||'';document.getElementById('genre1').value=r.genre1||'';document.getElementById('genre2').value=r.genre2||'';document.getElementById('rawRecipe').value='';show('edit')}
 function saveRecipe(){
  const name=document.getElementById('name').value.trim();if(!name){alert('料理名を入力してください');return}
- const data={name,rating:document.getElementById('ratingEdit').value,servings:document.getElementById('servings').value.trim(),ingredients:document.getElementById('ingredients').value.trim(),steps:document.getElementById('steps').value.trim(),memo:document.getElementById('memo').value.trim(),source:document.getElementById('source').value.trim(),updated:Date.now()};
+ const genre1=document.getElementById('genre1').value,genre2=document.getElementById('genre2').value;if(genre1&&genre2&&genre1===genre2){alert('同じジャンルを2つ選ぶことはできません');return}
+ const data={name,rating:document.getElementById('ratingEdit').value,genre1,genre2,servings:document.getElementById('servings').value.trim(),ingredients:document.getElementById('ingredients').value.trim(),steps:document.getElementById('steps').value.trim(),memo:document.getElementById('memo').value.trim(),source:document.getElementById('source').value.trim(),updated:Date.now()};
  if(editingId){const i=recipes.findIndex(x=>x.id===editingId);recipes[i]={...recipes[i],...data};currentId=editingId}else{data.id=Date.now();recipes.push(data);currentId=data.id}
  persist();openRecipe(currentId);
 }
@@ -150,6 +162,7 @@ function importBackup(){
  const f=document.getElementById('importFile').files[0];if(!f){alert('バックアップファイルを選択してください');return}
  const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(d.app!=='recipe-book'||!Array.isArray(d.recipes))throw 0;if(!confirm(`${d.recipes.length}件を復元し、現在のデータを置き換えます。よろしいですか？`))return;recipes=d.recipes;persist();alert('復元しました');show('home')}catch(e){alert('有効なバックアップファイルではありません')}};r.readAsText(f);
 }
+setupGenres();
 history.replaceState({screen:'home'},'',location.href);
 renderList();
 
